@@ -1,0 +1,420 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Community - QuickCompost</title>
+    <link rel="stylesheet" href="styles.css">
+    <!-- Add Leaflet CSS -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
+          integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY="
+          crossorigin=""/>
+    <!-- Add Leaflet JavaScript -->
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
+            integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo="
+            crossorigin=""></script>
+    <!-- Add OpenStreetMap Nominatim for geocoding -->
+    <script src="https://unpkg.com/leaflet-control-geocoder/dist/Control.Geocoder.js"></script>
+    <link rel="stylesheet" href="https://unpkg.com/leaflet-control-geocoder/dist/Control.Geocoder.css"/>
+</head>
+<body>
+    <nav class="navbar">
+        <div class="nav-container">
+            <h1 class="logo">QuickCompost</h1>
+            <ul class="nav-links">
+                <li><a href="index.html">Home</a></li>
+                <li><a href="sdgs.html">SDGs</a></li>
+                <li><a href="guide.html">Guide</a></li>
+                <li><a href="chat.html">AI Chat</a></li>
+                <li><a href="tutorials.html">Tutorials</a></li>
+                <li><a href="community.html" class="active">Community</a></li>
+            </ul>
+        </div>
+    </nav>
+
+    <main class="container">
+        <section class="hero">
+            <h1>🌍 Join the Composting Community</h1>
+            <p class="hero-text">
+                Connect with fellow composters and discover local resources to make a bigger impact!
+            </p>
+        </section>
+
+        <section class="local-programs">
+            <h2>📍 Find Local Composting Programs</h2>
+            <div class="program-finder">
+                <div class="search-box">
+                    <input type="text" id="location-search" placeholder="Enter your city or zip code">
+                    <button class="search-btn" onclick="searchLocation()">Search</button>
+                </div>
+                <div id="map-container" style="height: 400px; margin-bottom: 20px; border-radius: 10px; overflow: hidden;">
+                    <div id="map" style="height: 100%; width: 100%;"></div>
+                </div>
+                <div class="program-results" id="program-results">
+                    <h3>Found Locations:</h3>
+                </div>
+            </div>
+        </section>
+
+        <section class="impact-calculator">
+            <h2>📊 Composting Impact Calculator</h2>
+            <p>See how much waste YOU are keeping out of landfills!</p>
+            
+            <div class="calculator-form">
+                <div class="input-group">
+                    <label for="waste-amount">Average Weekly Food Waste (lbs):</label>
+                    <input type="number" id="waste-amount" min="0" step="0.5" placeholder="Enter amount">
+                </div>
+
+                <div class="input-group">
+                    <label for="composting-duration">How Long Have You Been Composting?</label>
+                    <select id="composting-duration">
+                        <option value="">Select duration</option>
+                        <option value="4">1 month (4 weeks)</option>
+                        <option value="12">3 months (12 weeks)</option>
+                        <option value="24">6 months (24 weeks)</option>
+                        <option value="52">1 year (52 weeks)</option>
+                        <option value="104">2 years (104 weeks)</option>
+                    </select>
+                </div>
+
+                <button class="calculate-btn" onclick="calculateImpact()">Calculate Impact</button>
+
+                <div class="impact-results">
+                    <div class="result-row">
+                        <div class="result-card">
+                            <h3>Waste Diverted</h3>
+                            <p class="result-value" id="waste-diverted">0 lbs</p>
+                            <p class="result-note">Total waste kept out of landfills</p>
+                        </div>
+
+                        <div class="result-card">
+                            <h3>CO₂ Equivalent Saved</h3>
+                            <p class="result-value" id="co2-saved">0 lbs</p>
+                            <p class="result-note">Greenhouse gas emissions prevented</p>
+                        </div>
+
+                        <div class="result-card">
+                            <h3>Compost Created</h3>
+                            <p class="result-value" id="compost-created">0 lbs</p>
+                            <p class="result-note">Rich soil produced for gardens</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <script>
+            let map;
+            let markers = [];
+            const geocoder = L.Control.Geocoder.nominatim();
+
+            // Initialize the map
+            function initMap() {
+                // Set initial view to a default location (e.g., United States)
+                map = L.map('map').setView([39.8283, -98.5795], 4);
+
+                // Add OpenStreetMap tiles
+                L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+                    maxZoom: 19,
+                    attribution: '© OpenStreetMap contributors'
+                }).addTo(map);
+
+                // Add search control
+                const searchControl = L.Control.geocoder({
+                    defaultMarkGeocode: false
+                })
+                .on('markgeocode', function(e) {
+                    const center = e.geocode.center;
+                    map.setView(center, 12);
+                    searchNearbyComposting(center.lat, center.lng);
+                })
+                .addTo(map);
+            }
+
+            // Search for location and find nearby composting facilities
+            function searchLocation() {
+                const searchInput = document.getElementById('location-search').value.trim();
+                if (!searchInput) {
+                    alert('Please enter a location to search');
+                    return;
+                }
+
+                // Use Nominatim for geocoding with more specific parameters
+                fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(searchInput)}&countrycodes=us&limit=1`)
+                    .then(response => response.json())
+                    .then(data => {
+                        if (data && data.length > 0) {
+                            const location = data[0];
+                            const lat = parseFloat(location.lat);
+                            const lon = parseFloat(location.lon);
+                            
+                            // Center map on result
+                            map.setView([lat, lon], 12);
+                            
+                            // Search for composting facilities nearby
+                            searchNearbyComposting(lat, lon);
+                        } else {
+                            alert('Location not found. Please try a different search or add state/country to be more specific (e.g., "New York, NY, USA")');
+                        }
+                    })
+                    .catch(error => {
+                        console.error('Error:', error);
+                        alert('Error searching for location. Please try again.');
+                    });
+            }
+
+            // Search for composting facilities using Overpass API
+            function searchNearbyComposting(lat, lng) {
+                // Clear existing markers
+                markers.forEach(marker => map.removeLayer(marker));
+                markers = [];
+
+                // Create a loading message
+                const resultsContainer = document.getElementById('program-results');
+                resultsContainer.innerHTML = '<p>Searching for facilities...</p>';
+
+                // Overpass API query for recycling and waste management facilities
+                const query = `
+                    [out:json][timeout:25];
+                    (
+                        // Composting facilities
+                        node["waste"="compost"](around:15000,${lat},${lng});
+                        way["waste"="compost"](around:15000,${lat},${lng});
+                        
+                        // Recycling centers that accept organic waste
+                        node["recycling:organic"="yes"](around:15000,${lat},${lng});
+                        way["recycling:organic"="yes"](around:15000,${lat},${lng});
+                        
+                        // Community gardens and urban farms
+                        node["garden:type"="community"](around:15000,${lat},${lng});
+                        way["garden:type"="community"](around:15000,${lat},${lng});
+                        
+                        // Urban farms
+                        node["landuse"="farmyard"]["organic"="yes"](around:15000,${lat},${lng});
+                        way["landuse"="farmyard"]["organic"="yes"](around:15000,${lat},${lng});
+                        
+                        // General recycling centers (as fallback)
+                        node["amenity"="recycling"]["recycling_type"="centre"](around:15000,${lat},${lng});
+                        way["amenity"="recycling"]["recycling_type"="centre"](around:15000,${lat},${lng});
+                    );
+                    out body;
+                    >;
+                    out skel qt;
+                `;
+
+                // Make request to Overpass API
+                fetch('https://overpass-api.de/api/interpreter', {
+                    method: 'POST',
+                    body: query
+                })
+                .then(response => response.json())
+                .then(data => {
+                    const elements = data.elements;
+                    let html = '<h3>Found Facilities:</h3><div class="program-list">';
+                    let foundFacilities = false;
+
+                    elements.forEach(element => {
+                        if ((element.type === 'node' || element.type === 'way') && element.tags && element.lat && element.lon) {
+                            foundFacilities = true;
+                            const facilityType = getFacilityType(element.tags);
+                            const facilityName = element.tags.name || getFacilityDefaultName(element.tags);
+                            
+                            // Create a custom icon based on facility type
+                            const icon = L.divIcon({
+                                className: 'custom-marker',
+                                html: getFacilityIcon(element.tags),
+                                iconSize: [30, 30]
+                            });
+
+                            const marker = L.marker([element.lat, element.lon], { icon: icon })
+                                .addTo(map);
+
+                            // Create popup content
+                            const popupContent = createPopupContent(element.tags, facilityName, facilityType);
+                            marker.bindPopup(popupContent);
+                            markers.push(marker);
+
+                            // Add to list view
+                            html += `
+                                <div class="program-card">
+                                    <div class="card-header">
+                                        ${getFacilityIcon(element.tags)}
+                                        <h3>${facilityName}</h3>
+                                    </div>
+                                    <p class="facility-type">${facilityType}</p>
+                                    ${element.tags.operator ? `<p><strong>Operated by:</strong> ${element.tags.operator}</p>` : ''}
+                                    <div class="program-contact">
+                                        ${element.tags.address || element.tags['addr:full'] ? 
+                                            `<p>📍 ${element.tags.address || element.tags['addr:full']}</p>` : ''}
+                                        ${element.tags.opening_hours ? `<p>⏰ <strong>Hours:</strong> ${element.tags.opening_hours}</p>` : ''}
+                                        ${element.tags.phone ? `<p>📞 <a href="tel:${element.tags.phone}">${element.tags.phone}</a></p>` : ''}
+                                        ${element.tags.website ? `<p>🌐 <a href="${element.tags.website}" target="_blank">Visit Website</a></p>` : ''}
+                                    </div>
+                                    ${getAcceptedMaterials(element.tags)}
+                                </div>
+                            `;
+                        }
+                    });
+
+                    html += '</div>';
+
+                    if (!foundFacilities) {
+                        resultsContainer.innerHTML = `
+                            <div class="no-results">
+                                <p>No composting facilities found within 15km of this location.</p>
+                                <p>Try these alternatives:</p>
+                                <ul>
+                                    <li>Check with your local government's waste management department</li>
+                                    <li>Search for community gardens in your area</li>
+                                    <li>Consider starting a community composting program</li>
+                                    <li>Look for private composting services</li>
+                                </ul>
+                            </div>
+                        `;
+                    } else {
+                        resultsContainer.innerHTML = html;
+                    }
+                })
+                .catch(error => {
+                    console.error('Error:', error);
+                    resultsContainer.innerHTML = '<p class="error-text">Error searching for facilities. Please try again.</p>';
+                });
+            }
+
+            // Helper function to create popup content
+            function createPopupContent(tags, facilityName, facilityType) {
+                return `
+                    <div class="popup-content">
+                        <h3>${facilityName}</h3>
+                        <p class="facility-type">${facilityType}</p>
+                        ${tags.operator ? `<p><strong>Operated by:</strong> ${tags.operator}</p>` : ''}
+                        ${tags.address || tags['addr:full'] ? 
+                            `<p>📍 ${tags.address || tags['addr:full']}</p>` : ''}
+                        ${tags.opening_hours ? `<p>⏰ <strong>Hours:</strong> ${tags.opening_hours}</p>` : ''}
+                        ${tags.phone ? `<p>📞 <a href="tel:${tags.phone}">${tags.phone}</a></p>` : ''}
+                        ${tags.email ? `<p>📧 <a href="mailto:${tags.email}">${tags.email}</a></p>` : ''}
+                        ${tags.website ? `<p>🌐 <a href="${tags.website}" target="_blank">Visit Website</a></p>` : ''}
+                        ${tags.description ? `<p><strong>About:</strong> ${tags.description}</p>` : ''}
+                        ${getAcceptedMaterials(tags)}
+                    </div>
+                `;
+            }
+
+            // Helper function to determine facility type with more detail
+            function getFacilityType(tags) {
+                if (tags.waste === 'compost') return 'Composting Facility';
+                if (tags['recycling:organic'] === 'yes') return 'Organic Waste Recycling Center';
+                if (tags['garden:type'] === 'community') return 'Community Garden';
+                if (tags.landuse === 'farmyard' && tags.organic === 'yes') return 'Organic Urban Farm';
+                if (tags.amenity === 'recycling' && tags.recycling_type === 'centre') return 'Recycling Center';
+                return 'Waste Management Facility';
+            }
+
+            // Helper function to get a default name if none is provided
+            function getFacilityDefaultName(tags) {
+                const type = getFacilityType(tags);
+                return `Local ${type}`;
+            }
+
+            // Helper function to get facility icon
+            function getFacilityIcon(tags) {
+                if (tags.waste === 'compost') return '🌱';
+                if (tags['recycling:organic'] === 'yes') return '♻️';
+                if (tags['garden:type'] === 'community') return '🌿';
+                if (tags.landuse === 'farmyard' && tags.organic === 'yes') return '🚜';
+                if (tags.amenity === 'recycling') return '♻️';
+                return '📍';
+            }
+
+            // Helper function to display accepted materials
+            function getAcceptedMaterials(tags) {
+                const materials = [];
+                if (tags['recycling:organic'] === 'yes') materials.push('Organic Waste');
+                if (tags['recycling:garden_waste'] === 'yes') materials.push('Garden Waste');
+                if (tags['recycling:food_waste'] === 'yes') materials.push('Food Waste');
+                if (tags['recycling:green_waste'] === 'yes') materials.push('Green Waste');
+
+                if (materials.length > 0) {
+                    return `
+                        <div class="accepted-materials">
+                            <p><strong>Accepts:</strong> ${materials.join(', ')}</p>
+                        </div>
+                    `;
+                }
+                return '';
+            }
+
+            // Add event listener for Enter key
+            document.getElementById('location-search').addEventListener('keypress', function(e) {
+                if (e.key === 'Enter') {
+                    searchLocation();
+                }
+            });
+
+            // Calculator function
+            function calculateImpact() {
+                const wasteAmount = parseFloat(document.getElementById('waste-amount').value);
+                const duration = parseInt(document.getElementById('composting-duration').value);
+
+                if (isNaN(wasteAmount) || !duration) {
+                    alert('Please enter both waste amount and duration');
+                    return;
+                }
+
+                // Calculate total waste diverted
+                const totalWaste = wasteAmount * duration;
+                
+                // Calculate CO2 equivalent saved (0.5 kg CO2e per 1 kg food waste)
+                // Convert lbs to kg, multiply by 0.5, then convert back to lbs
+                const co2Saved = (totalWaste * 0.45359237 * 0.5) * 2.20462;
+                
+                // Calculate compost created (about 50% of original waste weight)
+                const compostCreated = totalWaste * 0.5;
+
+                // Update results with animations
+                animateValue('waste-diverted', totalWaste, 'lbs');
+                animateValue('co2-saved', co2Saved, 'lbs');
+                animateValue('compost-created', compostCreated, 'lbs');
+            }
+
+            function animateValue(elementId, value, unit) {
+                const element = document.getElementById(elementId);
+                const duration = 1000; // Animation duration in milliseconds
+                const start = parseFloat(element.textContent);
+                const end = value;
+                const startTime = performance.now();
+
+                function update(currentTime) {
+                    const elapsed = currentTime - startTime;
+                    const progress = Math.min(elapsed / duration, 1);
+
+                    const current = start + (end - start) * progress;
+                    element.textContent = `${Math.round(current)} ${unit}`;
+
+                    if (progress < 1) {
+                        requestAnimationFrame(update);
+                    }
+                }
+
+                requestAnimationFrame(update);
+            }
+
+            // Initialize map when the page loads
+            window.onload = initMap;
+        </script>
+
+        <section class="community-cta">
+            <h2>🌿 Let's create a greener planet—one compost pile at a time!</h2>
+            <div class="cta-buttons">
+                <a href="guide.html" class="btn">Start Composting</a>
+                <a href="chat.html" class="btn">Get Help</a>
+            </div>
+        </section>
+    </main>
+
+    <footer>
+        <p>&copy; 2025 QuickCompost. Making the world greener, one compost pile at a time! ��</p>
+    </footer>
+</body>
+</html> 
