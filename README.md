@@ -3,6 +3,8 @@
 ## Overview
 QuickCompost empowers individuals and communities to transform food waste into valuable resources through accessible composting practices. Our platform educates users, supports sustainable environmental practices, and aligns with global sustainability initiatives.
 
+This project was made using: HTML, CSS, and Javascript
+
 ## Features
 
 ### 1️⃣ Home Page
